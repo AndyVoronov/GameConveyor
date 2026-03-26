@@ -192,6 +192,7 @@ model GameBuild {
   game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   platform     Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
+  @@unique([gameId, version])
   @@map("game_builds")
 }
 

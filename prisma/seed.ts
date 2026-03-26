@@ -119,6 +119,105 @@ async function main() {
     console.log(`  ✅ ${created.name} (${requirements.length} требований)`);
   }
 
+  // ── Seed Games ──
+  console.log('\n🎮 Seeding games...');
+
+  const games = [
+    {
+      title: 'LuminaClash',
+      slug: 'luminaclash',
+      description: 'Territory control game. Move your light orb across a grid — cells you illuminate become yours. Place walls, grab power-ups, outmaneuver AI opponents, and control the most territory before time runs out.',
+      shortDesc: 'Real-time territory capture with light & shadow mechanics',
+      techStack: 'Phaser 3 + TypeScript + Vite',
+      genre: 'Arcade / Strategy',
+      targetAudience: 'casual',
+      repoUrl: 'https://github.com/AndyVoronov/LuminaClash',
+      status: 'READY_TO_PUBLISH' as const,
+      priority: 10,
+      platforms: [
+        { platformSlug: 'yandex-games', status: 'NOT_STARTED' as const },
+        { platformSlug: 'vk-play', status: 'NOT_STARTED' as const },
+        { platformSlug: 'crazygames', status: 'NOT_STARTED' as const },
+        { platformSlug: 'poki', status: 'NOT_STARTED' as const },
+        { platformSlug: 'game-distribution', status: 'NOT_STARTED' as const },
+      ],
+      builds: [
+        { version: '1.0.0', buildType: 'production', buildNotes: 'Full release: 7 milestones complete — core gameplay, advanced mechanics, campaign (15 levels), audio & juice, mobile & platforms, polish & launch' },
+      ],
+    },
+  ];
+
+  for (const game of games) {
+    const created = await prisma.game.upsert({
+      where: { slug: game.slug },
+      update: {
+        title: game.title,
+        description: game.description,
+        shortDesc: game.shortDesc,
+        techStack: game.techStack,
+        genre: game.genre,
+        targetAudience: game.targetAudience,
+        repoUrl: game.repoUrl,
+        status: game.status,
+        priority: game.priority,
+      },
+      create: {
+        title: game.title,
+        slug: game.slug,
+        description: game.description,
+        shortDesc: game.shortDesc,
+        techStack: game.techStack,
+        genre: game.genre,
+        targetAudience: game.targetAudience,
+        repoUrl: game.repoUrl,
+        status: game.status,
+        priority: game.priority,
+      },
+    });
+
+    // Link platforms
+    for (const pl of game.platforms) {
+      const platform = await prisma.platform.findUnique({ where: { slug: pl.platformSlug } });
+      if (platform) {
+        await prisma.gamePlatform.upsert({
+          where: {
+            gameId_platformId: {
+              gameId: created.id,
+              platformId: platform.id,
+            },
+          },
+          update: { status: pl.status },
+          create: {
+            gameId: created.id,
+            platformId: platform.id,
+            status: pl.status,
+          },
+        });
+      }
+    }
+
+    // Add build
+    for (const b of game.builds) {
+      await prisma.gameBuild.upsert({
+        where: {
+          gameId_version: {
+            gameId: created.id,
+            version: b.version,
+          },
+        },
+        update: { buildNotes: b.buildNotes, buildType: b.buildType },
+        create: {
+          gameId: created.id,
+          version: b.version,
+          buildType: b.buildType,
+          buildNotes: b.buildNotes,
+        },
+      });
+    }
+
+    console.log(`  ✅ ${created.title} (${game.platforms.length} площадок, status: ${game.status})`);
+  }
+
   console.log('\n✅ Seeding complete!');
 }
 
