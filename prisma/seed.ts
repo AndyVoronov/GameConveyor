@@ -145,6 +145,28 @@ async function main() {
         { version: '1.0.0', buildType: 'production', buildNotes: 'Full release: 7 milestones complete — core gameplay, advanced mechanics, campaign (15 levels), audio & juice, mobile & platforms, polish & launch' },
       ],
     },
+    {
+      title: 'JunkTowers',
+      slug: 'junktowers',
+      description: 'Tower Defense в сеттинге Warhammer 40K. Орк-мекбой ловит падающие обломки космического корабля и строит из них башни. 5 типов обломков → 5 типов башен, волновая система, WAAAGH!-метр.',
+      shortDesc: 'Ork tower defense — catch debris, build towers, WAAAGH!',
+      techStack: 'Phaser 3 + TypeScript + Vite',
+      genre: 'Tower Defense / Arcade',
+      targetAudience: 'casual',
+      repoUrl: 'https://github.com/AndyVoronov/JunkTowers',
+      status: 'IN_DEVELOPMENT' as const,
+      priority: 9,
+      platforms: [
+        { platformSlug: 'yandex-games', status: 'NOT_STARTED' as const },
+        { platformSlug: 'vk-play', status: 'NOT_STARTED' as const },
+        { platformSlug: 'crazygames', status: 'NOT_STARTED' as const },
+        { platformSlug: 'poki', status: 'NOT_STARTED' as const },
+        { platformSlug: 'game-distribution', status: 'NOT_STARTED' as const },
+      ],
+      builds: [
+        { version: '0.1.0', buildType: 'development', buildNotes: 'M1 core: ork player, falling debris (5 types), build slots, towers, enemies, WAAAGH! meter, wave system, HUD, game over' },
+      ],
+    },
   ];
 
   for (const game of games) {
