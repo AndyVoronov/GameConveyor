@@ -1,0 +1,284 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ПЛАТФОРМЫ (Yandex Games, VK Play, etc.)
+// ============================================
+
+model Platform {
+  id          String     @id @default(cuid())
+  name        String     // "Yandex Games", "VK Play", "CrazyGames"
+  slug        String     @unique // "yandex-games"
+  icon        String?    // URL иконки
+  color       String?    // Brand color hex
+  baseUrl     String?    // https://yandex.ru/games/
+  docsUrl     String?    // Documentation URL
+  description String?    // Brief description
+
+  // Integration config
+  adSdkType       String?    // "yandex-ads-sdk", "vk-ads", "crazygames-sdk"
+  apiBaseUrl      String?    // Platform API base URL
+  webhookSecret   String?    // For webhook callbacks
+  authType        String     @default("api-key") // "api-key", "oauth2", "none"
+
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  requirements  PlatformRequirement[]
+  games         GamePlatform[]
+  apiKeys       ApiKey[]
+  builds        GameBuild[]
+
+  @@map("platforms")
+}
+
+// ============================================
+// ТРЕБОВАНИЯ ПЛАТФОРМ
+// ============================================
+
+model PlatformRequirement {
+  id           String   @id @default(cuid())
+  platformId   String
+  category     String   // "technical", "content", "legal", "monetization", "performance"
+  title        String   // "Минимальный размер HTML5 игры: 10MB"
+  description  String?  // Detailed explanation
+  linkUrl      String?  // Link to official docs
+
+  isRequired   Boolean  @default(true)
+  priority     Int      @default(0) // Higher = more important
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  platform     Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, title])
+  @@map("platform_requirements")
+}
+
+// ============================================
+// ИГРЫ
+// ============================================
+
+model Game {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  shortDesc   String?  // One-line description
+
+  // Technical info
+  techStack    String?  // "HTML5/Canvas", "Phaser.js", "Unity WebGL"
+  genre        String?  // "Puzzle", "Arcade", "Strategy"
+  targetAudience String? // "casual", "midcore", "hardcore"
+
+  // Visual
+  coverImage  String?  // URL to cover image
+  screenshots String[] // URLs to screenshots
+
+  // Repository
+  repoUrl     String?  // GitHub repo URL
+
+  // Status
+  status      GameStatus @default(DRAFT)
+  priority    Int         @default(0)
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  platforms   GamePlatform[]
+  builds      GameBuild[]
+
+  @@map("games")
+}
+
+enum GameStatus {
+  DRAFT
+  IN_DEVELOPMENT
+  TESTING
+  READY_TO_PUBLISH
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// РАЗМЕЩЕНИЕ ИГРЫ НА ПЛАТФОРМЕ (M2M)
+// ============================================
+
+model GamePlatform {
+  id           String            @id @default(cuid())
+  gameId       String
+  platformId   String
+
+  // Platform-specific data
+  externalId   String?           // Game ID on the platform
+  externalUrl  String?           // Published game URL on platform
+
+  // Status tracking
+  status       PlacementStatus   @default(NOT_STARTED)
+
+  // Ad configuration
+  adEnabled    Boolean           @default(false)
+  adConfig     Json?             // Platform-specific ad config {interstitialInterval, rewardedEnabled, bannerPosition}
+  adRevenueModel String?         // "cpm", "cpa", "revshare"
+
+  // Compliance
+  complianceChecked  Boolean     @default(false)
+  complianceNotes    String?
+  complianceCheckedAt DateTime?
+
+  // Timestamps
+  submittedAt  DateTime?
+  publishedAt  DateTime?
+  rejectedAt   DateTime?
+  suspendedAt  DateTime?
+  rejectedReason String?
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Relations
+  game         Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform     Platform          @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  stats        GameStat[]
+
+  @@unique([gameId, platformId])
+  @@map("game_platforms")
+}
+
+enum PlacementStatus {
+  NOT_STARTED       // Ещё не начинали
+  IN_PREPARATION    // Готовим к подаче
+  PENDING_REVIEW    // Отправлено на модерацию
+  REJECTED          // Отклонено
+  PUBLISHED         // Опубликовано
+  SUSPENDED         // Приостановлено
+  DELISTED          // Удалено с площадки
+}
+
+// ============================================
+// БИЛДЫ ИГР
+// ============================================
+
+model GameBuild {
+  id           String   @id @default(cuid())
+  gameId       String
+  platformId   String?
+
+  version      String   // "1.0.0"
+  buildType    String   @default("production") // "development", "production", "preview"
+  buildUrl     String?  // URL to build artifact (ZIP, etc.)
+  fileSize     Int?     // Size in bytes
+  buildNotes   String?
+
+  status       BuildStatus @default(PENDING)
+
+  builtAt      DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform     Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
+
+  @@map("game_builds")
+}
+
+enum BuildStatus {
+  PENDING
+  BUILDING
+  READY
+  FAILED
+  DEPLOYED
+}
+
+// ============================================
+// СТАТИСТИКА
+// ============================================
+
+model GameStat {
+  id             String  @id @default(cuid())
+  gamePlatformId String
+
+  date           DateTime @db.Date()
+
+  // General metrics
+  impressions    Int     @default(0)
+  visits         Int     @default(0)
+  uniquePlayers  Int     @default(0)
+  newPlayers     Int     @default(0)
+  returningPlayers Int   @default(0)
+
+  // Engagement
+  avgSessionDuration Int  @default(0) // in seconds
+  totalPlaytime      Int  @default(0) // in seconds
+
+  // Revenue
+  adImpressions  Int     @default(0)
+  adClicks       Int     @default(0)
+  adRevenue      Float   @default(0) // USD equivalent
+
+  // Extra data (platform-specific metrics)
+  extraMetrics   Json?
+
+  createdAt      DateTime @default(now())
+
+  gamePlatform   GamePlatform @relation(fields: [gamePlatformId], references: [id], onDelete: Cascade)
+
+  @@unique([gamePlatformId, date])
+  @@index([gamePlatformId, date])
+  @@map("game_stats")
+}
+
+// ============================================
+// API-КЛЮЧИ ПЛАТФОРМ
+// ============================================
+
+model ApiKey {
+  id           String   @id @default(cuid())
+  platformId   String
+  name         String   // "Yandex Games - Production"
+  keyValue     String   // Encrypted API key/token (we'll handle encryption at app level)
+  scopes       String[] // ["read_stats", "manage_games"]
+
+  isActive     Boolean  @default(true)
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  platform     Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// ============================================
+// АУДИТ-ЛОГ
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String   // "game", "platform", "gamePlatform", "apiKey"
+  entityId   String
+  action     String   // "create", "update", "delete", "publish", "submit"
+  changes    Json?    // What changed {field: {old, new}}
+  metadata   Json?    // Extra context
+
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
